@@ -7,6 +7,8 @@ networks:
 volumes:
   mysql_volume:
     driver: local
+  portainer_data:
+    driver: local
 
 services:
   reverse-proxy:
@@ -14,7 +16,7 @@ services:
     ports:
       - "80:80"     # The HTTP port
       - "443:443"   # The HTTPS port
-      - "8080:8080" # The Web UI (enabled by --api)
+        #      - "8080:8080" # The Web UI (enabled by --api)
     volumes:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -53,9 +55,33 @@ services:
     networks:
       - proxy
     volumes:
-      - /opt/ghost_content:/var/lib/ghost/content
+      - "./ghost_content:/var/lib/ghost/content"
     depends_on:
       - db
+
+  portainer:
+    image: portainer/portainer
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`port.kevinscooper.com`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=myhttpchallenge"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    networks:
+      - proxy
+
+  watchtower:
+    container_name: watchtower
+    restart: always
+    image: v2tec/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy
 
   db:
     hostname: db
